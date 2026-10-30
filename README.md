@@ -40,7 +40,10 @@ let options = {
   Number matches,
   String prompt,      // Android only
   Boolean showPopup,  // Android only
-  Boolean showPartial 
+  Boolean showPartial,
+  Number completeSilenceMs,          // Android only
+  Number possiblyCompleteSilenceMs,  // Android only
+  Number minimumLengthMs             // Android only
 }
 
 window.plugins.speechRecognition.startListening(
@@ -54,6 +57,14 @@ This method has an options parameter with the following optional values:
 - `prompt` {String} displayed prompt of listener popup window (default `""`, Android only)
 - `showPopup` {Boolean} display listener popup window with prompt (default `true`, Android only)
 - `showPartial` {Boolean} Allow partial results to be returned (default `false`)
+- `completeSilenceMs` {Number} Android complete-silence hint in milliseconds (optional)
+- `possiblyCompleteSilenceMs` {Number} Android possible-completion silence hint in milliseconds (optional)
+- `minimumLengthMs` {Number} Android minimum recognition input length hint in milliseconds (optional)
+
+The three Android timing options are optional hints to the device's speech recognition service.
+The service may ignore them. They are not guaranteed timers and `minimumLengthMs`
+is not an additional post-speech delay. Omit them to retain the platform defaults.
+
 
 Result of success callback is an `Array` of recognized terms.
 

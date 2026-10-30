@@ -6,6 +6,12 @@ module.exports = {
     options = options || {};
     cordova.exec(successCallback, errorCallback, 'SpeechRecognition', 'startListening', [ options.language, options.matches, options.prompt, options.showPartial, options.showPopup, options.completeSilenceMs, options.possiblyCompleteSilenceMs, options.minimumLengthMs ]);
   },
+  subscribeDiagnostics: function(onEvent, onError) {
+    cordova.exec(onEvent, onError || function(){}, 'SpeechRecognition', 'subscribeDiagnostics', []);
+  },
+  unsubscribeDiagnostics: function(success, error) {
+    cordova.exec(success || function(){}, error || function(){}, 'SpeechRecognition', 'unsubscribeDiagnostics', []);
+  },
   stopListening: function(successCallback, errorCallback) {
     cordova.exec(successCallback, errorCallback, 'SpeechRecognition', 'stopListening', []);
   },

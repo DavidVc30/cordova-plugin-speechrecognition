@@ -10,6 +10,8 @@ import org.apache.cordova.PluginResult;
 
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
+import android.os.SystemClock;
 
 import android.app.Activity;
 import android.content.Context;
@@ -52,6 +54,28 @@ public class SpeechRecognition extends CordovaPlugin {
   private static final String RECORD_AUDIO_PERMISSION = Manifest.permission.RECORD_AUDIO;
 
   private CallbackContext callbackContext;
+  private CallbackContext diagnosticCallback;
+  private long readyAt = -1, speechAt = -1, endAt = -1;
+  private int configuredComplete = -1, configuredPossible = -1, configuredMinimum = -1;
+  private void diagnostic(String event, String detail) {
+    if (diagnosticCallback == null) return;
+    try {
+      JSONObject data = new JSONObject();
+      data.put("event", event);
+      data.put("elapsedMs", readyAt < 0 ? -1 : SystemClock.elapsedRealtime() - readyAt);
+      data.put("readyToSpeechMs", readyAt >= 0 && speechAt >= 0 ? speechAt - readyAt : -1);
+      data.put("speechToEndMs", speechAt >= 0 && endAt >= 0 ? endAt - speechAt : -1);
+      data.put("endToResultMs", endAt >= 0 && ("results".equals(event) || "error".equals(event)) ? SystemClock.elapsedRealtime() - endAt : -1);
+      data.put("completeSilenceMs", configuredComplete);
+      data.put("possiblyCompleteSilenceMs", configuredPossible);
+      data.put("minimumLengthMs", configuredMinimum);
+      data.put("detail", detail);
+      PluginResult result = new PluginResult(PluginResult.Status.OK, data);
+      result.setKeepCallback(true);
+      diagnosticCallback.sendPluginResult(result);
+    } catch (JSONException e) { Log.e(LOG_TAG, "Diagnostic event failure", e); }
+  }
+
   private LanguageDetailsChecker languageDetailsChecker;
   private Activity activity;
   private Context context;
@@ -78,11 +102,23 @@ public class SpeechRecognition extends CordovaPlugin {
 
   @Override
   public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
-    this.callbackContext = callbackContext;
+    if (!"subscribeDiagnostics".equals(action) && !"unsubscribeDiagnostics".equals(action)) this.callbackContext = callbackContext;
 
     Log.d(LOG_TAG, "execute() action " + action);
 
     try {
+      if ("subscribeDiagnostics".equals(action)) {
+        diagnosticCallback = callbackContext;
+        PluginResult subscribed = new PluginResult(PluginResult.Status.NO_RESULT);
+        subscribed.setKeepCallback(true);
+        callbackContext.sendPluginResult(subscribed);
+        return true;
+      }
+      if ("unsubscribeDiagnostics".equals(action)) {
+        if (diagnosticCallback != null) { diagnosticCallback.success(); diagnosticCallback = null; }
+        callbackContext.success();
+        return true;
+      }
       if (IS_RECOGNITION_AVAILABLE.equals(action)) {
         boolean available = isRecognitionAvailable();
         PluginResult result = new PluginResult(PluginResult.Status.OK, available);
@@ -118,6 +154,11 @@ public class SpeechRecognition extends CordovaPlugin {
         int completeSilenceMs = args.optInt(5, -1);
         int possiblyCompleteSilenceMs = args.optInt(6, -1);
         int minimumLengthMs = args.optInt(7, -1);
+        configuredComplete = completeSilenceMs;
+        configuredPossible = possiblyCompleteSilenceMs;
+        configuredMinimum = minimumLengthMs;
+        readyAt = speechAt = endAt = -1;
+        diagnostic("start", "");
         startListening(lang, matches, prompt, showPartial, showPopup,
                 completeSilenceMs, possiblyCompleteSilenceMs, minimumLengthMs);
 
@@ -285,6 +326,8 @@ public class SpeechRecognition extends CordovaPlugin {
 
     @Override
     public void onBeginningOfSpeech() {
+      speechAt = SystemClock.elapsedRealtime();
+      diagnostic("beginning", "");
     }
 
     @Override
@@ -293,12 +336,15 @@ public class SpeechRecognition extends CordovaPlugin {
 
     @Override
     public void onEndOfSpeech() {
+      endAt = SystemClock.elapsedRealtime();
+      diagnostic("end", "");
     }
 
     @Override
     public void onError(int errorCode) {
       String errorMessage = getErrorText(errorCode);
       Log.d(LOG_TAG, "Error: " + errorMessage);
+      diagnostic("error", errorMessage);
       callbackContext.error(errorMessage);
     }
 
@@ -328,13 +374,17 @@ public class SpeechRecognition extends CordovaPlugin {
 
     @Override
     public void onReadyForSpeech(Bundle params) {
+      readyAt = SystemClock.elapsedRealtime();
+      speechAt = endAt = -1;
       Log.d(LOG_TAG, "onReadyForSpeech");
+      diagnostic("ready", "");
     }
 
     @Override
     public void onResults(Bundle results) {
       ArrayList<String> matches = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION);
       Log.d(LOG_TAG, "SpeechRecognitionListener results: " + matches);
+      diagnostic("results", matches == null ? "" : matches.toString());
       try {
         JSONArray jsonMatches = new JSONArray(matches);
         callbackContext.success(jsonMatches);

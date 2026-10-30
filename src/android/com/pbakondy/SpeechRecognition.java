@@ -102,7 +102,7 @@ public class SpeechRecognition extends CordovaPlugin {
 
   @Override
   public boolean execute(String action, JSONArray args, CallbackContext callbackContext) throws JSONException {
-    if (!"subscribeDiagnostics".equals(action) && !"unsubscribeDiagnostics".equals(action)) this.callbackContext = callbackContext;
+    if (!"subscribeDiagnostics".equals(action) && !"unsubscribeDiagnostics".equals(action) && !STOP_LISTENING.equals(action)) this.callbackContext = callbackContext;
 
     Log.d(LOG_TAG, "execute() action " + action);
 
@@ -166,7 +166,7 @@ public class SpeechRecognition extends CordovaPlugin {
       }
 
       if (STOP_LISTENING.equals(action)) {
-        final CallbackContext callbackContextStop = this.callbackContext;
+        final CallbackContext callbackContextStop = callbackContext;
         view.post(new Runnable() {
           @Override
           public void run() {
